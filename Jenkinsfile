@@ -1,69 +1,77 @@
 pipeline {
- agent any
- 
- stages {
-	stage('clone'){
-		steps {
-			echo 'Cloning source code'
-			git branch:'main', url: 'https://github.com/PhanTienDung-BIT230111/successpls.git'
-		}
-	} // end clone
+    agent any
 
-	stage('restore package') {
-		steps
-		{
-			echo 'Restore package'
-			bat 'dotnet restore'
-		}
-	}
+    stages {
+        stage('Clone') {
+            steps {
+                echo 'Cloning source code'
+                git branch: 'main', url: 'https://github.com/PhanTienDung-BIT230111/successpls.git'
+            }
+        }
 
-	stage ('build') {
-		steps {
-			echo 'build project netcore'
-			bat 'dotnet build  --configuration Release'
-		}
-	}
-	
-	stage ('tests') {
-		steps{
-			echo 'running test...'
-			bat 'dotnet test --no-build --verbosity normal'
-		}
-	}
+        stage('Restore Packages') {
+            steps {
+                echo 'Restoring packages'
+                bat 'dotnet restore'
+            }
+        }
 
-	stage ('public den t thu muc')
-	{
-		steps{
-			echo 'Publishing...'
-			bat 'dotnet publish -c Release -o ./publish'
-		}
-	}
+        stage('Build') {
+            steps {
+                echo 'Building project'
+                bat 'dotnet build --configuration Release'
+            }
+        }
 
-	stage ('Publish') {
-		steps {
-			echo 'public 2 runnig folder'
-		//iisreset /stop // stop iis de ghi de file 
-			
-			bat 'xcopy "%WORKSPACE%\\publish" /E /Y /I /R "c:\\wwwroot\\myproject"'
- 		}
-	}
+        stage('Test') {
+            steps {
+                echo 'Running tests'
+                bat 'dotnet test --no-build --verbosity normal'
+            }
+        }
 
-	stage('Deploy to IIS') {
+        stage('Publish to Folder') {
+            steps {
+                echo 'Publishing project'
+                bat 'dotnet publish -c Release -o "%WORKSPACE%\\publish"'
+            }
+        }
+
+        stage('Stop IIS') {
+            steps {
+                echo 'Stopping IIS to avoid sharing violation'
+                bat 'iisreset /stop'
+            }
+        }
+
+        stage('Copy to IIS folder') {
+            steps {
+                echo 'Copying files to IIS directory'
+                bat '''
+                robocopy "%WORKSPACE%\\publish" "C:\\wwwroot\\myproject" /MIR /R:5 /W:5
+                '''
+            }
+        }
+
+        stage('Start IIS') {
+            steps {
+                echo 'Starting IIS'
+                bat 'iisreset /start'
+            }
+        }
+
+        stage('Deploy to IIS') {
             steps {
                 powershell '''
-               
-                # Tạo website nếu chưa có
                 Import-Module WebAdministration
+
                 if (-not (Test-Path IIS:\\Sites\\MySite)) {
-                    New-Website -Name "MySite" -Port 82 -PhysicalPath "c:\\wwwroot\\myproject"
+                    New-Website -Name "MySite" -Port 82 -PhysicalPath "C:\\wwwroot\\myproject" -ApplicationPool ".NET v4.5"
+                } else {
+                    Write-Host "Website already exists."
                 }
                 '''
             }
-        } // end deploy iis
-
-
-	 
-
-  
-  } // end stages
-}//end pipeline
+        }
+    }
+}
