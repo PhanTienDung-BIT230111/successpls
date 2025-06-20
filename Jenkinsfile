@@ -71,7 +71,7 @@ pipeline {
                     Write-Host "Website already exists."
                 }
                 '''
-            }
+            }  
         }
     }
 }
